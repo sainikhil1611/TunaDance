@@ -122,7 +122,7 @@ def test(opt):
         for wav_file in glob.glob(os.path.join(opt.music_dir, "*.wav")):
             songname = os.path.splitext(os.path.basename(wav_file))[0]
             # create temp folder (or use the cache folder if specified)
-            if songname in test_list:
+            if True:  # songname in test_list:
                 if opt.cache_features:
                     save_dir = os.path.join(opt.feature_cache_dir, songname)
                     Path(save_dir).mkdir(parents=True, exist_ok=True)
@@ -177,7 +177,8 @@ def test(opt):
             data_tuple, "test", opt.render_dir, render_count=-1, fk_out=fk_out, mode="long",  render=not opt.no_render
         )
     print("Done")
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     for temp_dir in temp_dir_list:
         temp_dir.cleanup()
 

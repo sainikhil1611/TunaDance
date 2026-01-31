@@ -30,7 +30,8 @@ def test(opt):
 
         file_name = file[:-4]
         music_fea = np.load(os.path.join(music_dir, file))
-        music_fea = torch.from_numpy(music_fea).cuda().unsqueeze(0)
+        device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+        music_fea = torch.from_numpy(music_fea).float().to(device).unsqueeze(0)
         music_fea = music_fea.repeat(count, 1, 1)
         all_filenames = [file_name]*count
 

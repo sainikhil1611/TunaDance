@@ -19,7 +19,10 @@ from tqdm import tqdm
 from typing import NewType
 Tensor = NewType('Tensor', torch.Tensor)
 import torch.nn.functional as F
-import pickle5 as pickle
+try:
+    import pickle5 as pickle
+except ImportError:
+    import pickle
 
 
 smpl_joints = [
@@ -481,7 +484,7 @@ class SMPLX_Skeleton:
         # offsets = smpl_offsets
         self.device = device
         self.parents = smplx_parents
-        self.J = np.load("/data/lrh/project/Dance/mdm_v2/model/smplx_neu_J_1.npy")
+        self.J = np.load(os.path.join(os.path.dirname(__file__), "smplx_neu_J_1.npy"))
         self.J = torch.from_numpy(self.J).to(device).unsqueeze(dim=0).repeat(batch, 1, 1)
           
     def batch_rodrigues(self, rot_vecs: Tensor, epsilon: float = 1e-8,) -> Tensor:
@@ -657,7 +660,7 @@ class SMPLX_Skeleton:
     
 if __name__ == "__main__":
     print("1")
-    device = f'cuda:{0}'
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     
     
     smplx_fk = SMPLX_Skeleton(device = device, batch=150)

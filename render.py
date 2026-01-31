@@ -3,7 +3,8 @@ import numpy as np
 import torch
 import cv2
 import os
-os.environ["PYOPENGL_PLATFORM"] = "osmesa" 
+# os.environ["PYOPENGL_PLATFORM"] = "osmesa"  # Not available on macOS
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 from tqdm import tqdm
 from smplx import SMPL, SMPLX, SMPLH
 import pyrender
@@ -70,9 +71,10 @@ class MovieMaker():
         # self.smpl.to(f'cuda:{args.gpu}').eval()
 
         self.smplx = SMPLX(SMPLX_path, use_pca=False, flat_hand_mean=True).eval()
-        self.smplx.to(f'cuda:{args.gpu}').eval()
+        _device = "mps" if torch.backends.mps.is_available() else "cpu"
+        self.smplx.to(_device).eval()
 
-        self.scene = pyrender.Scene()
+        self.scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 1.0])
         camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0)
         camera_pose = look_at(self.eyes[5], self.centers[5], self.ups[5])       # 2
         self.scene.add(camera, pose=camera_pose)
@@ -81,9 +83,9 @@ class MovieMaker():
         self.r = pyrender.OffscreenRenderer(self.img_size[0], self.img_size[1])
         
         
-        self.mesh = trimesh.load(trimesh_path)
-        floor_mesh  = pyrender.Mesh.from_trimesh(self.mesh)   
-        floor_node = self.scene.add(floor_mesh)
+        # self.mesh = trimesh.load(trimesh_path)
+        # floor_mesh  = pyrender.Mesh.from_trimesh(self.mesh)
+        # floor_node = self.scene.add(floor_mesh)
 
 
     def save_video(self, save_path, color_list):
@@ -160,9 +162,9 @@ class MovieMaker():
             output_file = os.path.join(self.save_path, tab + '-' + str(i) + '-music.mp4')
             self.save_video(movie_file, color_list)
             if music_file is not None:
-                subprocess.run(['assets/ffmpeg-6.0-amd64-static/ffmpeg','-i',movie_file,'-i',music_file,'-shortest',output_file])
+                subprocess.run(['ffmpeg','-i',movie_file,'-i',music_file,'-shortest',output_file])
             else:
-                subprocess.run(['assets/ffmpeg-6.0-amd64-static/ffmpeg','-i',movie_file,output_file])
+                subprocess.run(['ffmpeg','-i',movie_file,output_file])
             # if music_file is not None:
             #     subprocess.run(['ffmpeg','-i',movie_file,'-i',music_file,'-shortest',output_file])
             # else:
@@ -203,7 +205,7 @@ class MovieMaker():
     
     def run(self, seq_rot, music_file=None, tab='', save_pt=False):
         if isinstance(seq_rot, np.ndarray):
-            seq_rot = torch.tensor(seq_rot, dtype=torch.float32, device=f'cuda:{args.gpu}')
+            seq_rot = torch.tensor(seq_rot, dtype=torch.float32, device="mps" if torch.backends.mps.is_available() else "cpu")
 
         if save_pt:
             torch.save(seq_rot.detach().cpu(), os.path.join(self.save_path, tab +'_pose.pt'))
@@ -270,9 +272,9 @@ class MovieMaker():
         output_file = os.path.join(self.save_path, tab + 'z.mp4')
         self.save_video(movie_file, color_list)
         if music_file is not None:
-            subprocess.run(['assets/ffmpeg-6.0-amd64-static/ffmpeg','-i',movie_file,'-i',music_file,'-shortest',output_file])
+            subprocess.run(['ffmpeg','-i',movie_file,'-i',music_file,'-shortest',output_file])
         else:
-            subprocess.run(['assets/ffmpeg-6.0-amd64-static/ffmpeg','-i',movie_file,output_file])
+            subprocess.run(['ffmpeg','-i',movie_file,output_file])
         # if music_file is not None:
         #     subprocess.run(['ffmpeg','-i',movie_file,'-i',music_file,'-shortest',output_file])
         # else:

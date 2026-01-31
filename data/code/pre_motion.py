@@ -14,7 +14,7 @@ from dataset.preprocess import Normalizer, vectorize_many
 
 
 def motion_feats_extract(inputs_dir, outputs_dir):
-    device = "cuda:0"
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("extracting")
     raw_fps = 30
     data_fps = 30

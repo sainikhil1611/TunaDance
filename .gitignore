@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# my
+# Project-specific
 experiments
 data/finedance
 generated
@@ -13,6 +13,22 @@ assets/checkpoints/
 assets/smpl_model/
 assets/ffmpeg-6.0-amd64-static/
 assets/NORMAL_new.obj
+
+# User-generated output and uploaded music
+output/
+custom_music/
+*.mp4
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/
 
 # C extensions
 *.so
