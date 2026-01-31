@@ -8,7 +8,7 @@ tags:
   - music-to-dance
   - 3d-motion
 library_name: pytorch
-pipeline_tag: text-to-video
+pipeline_tag: audio-to-video
 base_model: li-ronghui/FineDance
 ---
 
