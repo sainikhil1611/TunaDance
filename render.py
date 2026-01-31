@@ -47,6 +47,68 @@ def ax_from_6v(q):
     ax = matrix_to_axis_angle(mat)
     return ax
 
+def build_vertex_colors(weights, part2num):
+    """Assign RGBA vertex colors based on SMPLX body part segmentation.
+
+    Uses skinning weights to determine which body part each vertex belongs to,
+    then maps clothing/skin colors accordingly.
+    """
+    n_verts = weights.shape[0]
+    dominant_joint = np.argmax(weights, axis=1)
+
+    # Color palette (RGB 0-255)
+    SKIN = [210, 170, 140]          # warm skin tone
+    SHIRT = [45, 85, 135]           # dark blue shirt
+    PANTS = [50, 50, 55]            # dark charcoal pants
+    SHOES = [35, 35, 35]            # near-black shoes
+    EYE_REGION = [90, 60, 50]       # darker around eyes
+    LIPS = [180, 110, 105]          # subtle lip color
+    HAIR = [55, 40, 30]             # dark brown hair/scalp
+
+    # Map joint IDs to part names
+    id2name = {v: k for k, v in part2num.items()}
+
+    # Define color groups
+    skin_parts = {'L_ForeArm', 'R_ForeArm', 'L_Hand', 'R_Hand', 'Neck',
+                  'L_Index1', 'L_Index2', 'L_Index3', 'L_Middle1', 'L_Middle2', 'L_Middle3',
+                  'L_Pinky1', 'L_Pinky2', 'L_Pinky3', 'L_Ring1', 'L_Ring2', 'L_Ring3',
+                  'L_Thumb1', 'L_Thumb2', 'L_Thumb3',
+                  'R_Index1', 'R_Index2', 'R_Index3', 'R_Middle1', 'R_Middle2', 'R_Middle3',
+                  'R_Pinky1', 'R_Pinky2', 'R_Pinky3', 'R_Ring1', 'R_Ring2', 'R_Ring3',
+                  'R_Thumb1', 'R_Thumb2', 'R_Thumb3'}
+    shirt_parts = {'Spine', 'Spine1', 'Spine2', 'L_Shoulder', 'R_Shoulder',
+                   'L_UpperArm', 'R_UpperArm', 'Global'}
+    pants_parts = {'L_Thigh', 'R_Thigh', 'L_Calf', 'R_Calf'}
+    shoe_parts = {'L_Foot', 'R_Foot', 'L_Toes', 'R_Toes'}
+    eye_parts = {'L_Eye', 'R_Eye'}
+    lip_parts = {'Jaw'}
+    head_parts = {'Head'}
+
+    colors = np.zeros((n_verts, 4), dtype=np.uint8)
+    for vi in range(n_verts):
+        jid = dominant_joint[vi]
+        name = id2name.get(jid, 'Global')
+        if name in skin_parts:
+            c = SKIN
+        elif name in shirt_parts:
+            c = SHIRT
+        elif name in pants_parts:
+            c = PANTS
+        elif name in shoe_parts:
+            c = SHOES
+        elif name in eye_parts:
+            c = EYE_REGION
+        elif name in lip_parts:
+            c = LIPS
+        elif name in head_parts:
+            c = SKIN
+        else:
+            c = SKIN
+        colors[vi] = [c[0], c[1], c[2], 255]
+
+    return colors
+
+
 class MovieMaker():
     def __init__(self, save_path) -> None:
         self.mag = 2
@@ -74,12 +136,29 @@ class MovieMaker():
         _device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.smplx.to(_device).eval()
 
-        self.scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 1.0])
+        # Precompute vertex colors for clothing/skin appearance
+        smplx_data = np.load(SMPLX_path, allow_pickle=True)
+        self.vertex_colors = build_vertex_colors(
+            smplx_data['weights'], smplx_data['part2num'].item()
+        )
+
+        # Subtle facial expression (SMPLX expression coefficients)
+        # First component controls smile intensity
+        self._expression = torch.zeros(10)
+        self._expression[1] = 0.7   # subtle smile
+        self._expression[2] = 0.3   # slight jaw/cheek activation
+
+        self.scene = pyrender.Scene(bg_color=[0.12, 0.12, 0.15, 1.0],
+                                     ambient_light=[0.3, 0.3, 0.35])
         camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0)
         camera_pose = look_at(self.eyes[5], self.centers[5], self.ups[5])       # 2
         self.scene.add(camera, pose=camera_pose)
         light = pyrender.DirectionalLight(color=np.ones(3), intensity=3.0)
         self.scene.add(light, pose=camera_pose)
+        # Fill light from opposite side for better face/body visibility
+        fill_pose = look_at(-self.eyes[5], self.centers[5], self.ups[5])
+        fill_light = pyrender.DirectionalLight(color=np.ones(3), intensity=1.0)
+        self.scene.add(fill_light, pose=fill_pose)
         self.r = pyrender.OffscreenRenderer(self.img_size[0], self.img_size[1])
         
         
@@ -122,7 +201,6 @@ class MovieMaker():
         elif args.mode == "smplx":
             output = self.smplx.forward(
                 betas = torch.zeros([motion.shape[0], 10]).to(motion.device),
-                # transl = motion[:,:3],
                 transl = motion[:,:3],
                 global_orient = motion[:,3:6],
                 body_pose = motion[:,6:69],
@@ -131,20 +209,22 @@ class MovieMaker():
                 reye_pose = torch.zeros([motion.shape[0], 3]).to(motion),
                 left_hand_pose = motion[:,69:69+45],
                 right_hand_pose = motion[:,69+45:],
-                expression= torch.zeros([motion.shape[0], 10]).to(motion),
+                expression= self._expression.unsqueeze(0).expand(motion.shape[0], -1).to(motion),
                 )
-        
+
         meshes = []
         for i in range(output.vertices.shape[0]):
             if args.mode == 'smplh':
-                mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplh.faces)
+                mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplh.faces,
+                                       vertex_colors=self.vertex_colors)
             elif args.mode == 'smplx':
-                mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplx.faces)
+                mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplx.faces,
+                                       vertex_colors=self.vertex_colors)
             elif args.mode == 'smpl':
-                mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smpl.faces)
-            # mesh.export(os.path.join(self.save_path, f'{i}.obj'))
+                mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smpl.faces,
+                                       vertex_colors=self.vertex_colors)
             meshes.append(mesh)
-        
+
         return meshes
 
 
@@ -180,7 +260,7 @@ class MovieMaker():
         for i in tqdm(range(num)):
             mesh_nodes = []
             for mesh in meshes[i]:
-                render_mesh = pyrender.Mesh.from_trimesh(mesh)   
+                render_mesh = pyrender.Mesh.from_trimesh(mesh, smooth=True)
                 mesh_node = self.scene.add(render_mesh)
                 mesh_nodes.append(mesh_node)
             color, _ = self.r.render(self.scene, flags=pyrender.RenderFlags.SHADOWS_DIRECTIONAL)
@@ -193,7 +273,7 @@ class MovieMaker():
     def render_imgs(self, meshes):
         colors = []
         for mesh in meshes:
-            render_mesh = pyrender.Mesh.from_trimesh(mesh)   
+            render_mesh = pyrender.Mesh.from_trimesh(mesh, smooth=True)
             mesh_node = self.scene.add(render_mesh)
             color, _ = self.r.render(self.scene, flags=pyrender.RenderFlags.SHADOWS_DIRECTIONAL)
             colors.append(color)
@@ -235,7 +315,6 @@ class MovieMaker():
         elif args.mode == "smplx":
             output = self.smplx.forward(
                 betas = torch.zeros([seq_rot.shape[0], 10]).to(seq_rot.device),
-                # transl = motion[:,:3],
                 transl = seq_rot[:,:3],
                 global_orient = seq_rot[:,3:6],
                 body_pose = seq_rot[:,6:69],
@@ -244,9 +323,9 @@ class MovieMaker():
                 reye_pose = torch.zeros([seq_rot.shape[0], 3]).to(seq_rot),
                 left_hand_pose = seq_rot[:,69:69+45],
                 right_hand_pose = seq_rot[:,69+45:],
-                expression= torch.zeros([seq_rot.shape[0], 10]).to(seq_rot),
+                expression= self._expression.unsqueeze(0).expand(seq_rot.shape[0], -1).to(seq_rot),
                 )
-        
+
         N, V, DD = output.vertices.shape                # 150, 6890, 3
         vertices = output.vertices.reshape((B, -1, V, DD))  #  # 150, 1, 6890, 3
         
@@ -256,14 +335,15 @@ class MovieMaker():
             #     break
             view = []
             for v in vertices[i]:
-                # vertices[:,2] *= -1
                 if args.mode == 'smplh':
-                    mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplh.faces)
+                    mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplh.faces,
+                                           vertex_colors=self.vertex_colors)
                 elif args.mode == 'smplx':
-                    mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplx.faces)
+                    mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smplx.faces,
+                                           vertex_colors=self.vertex_colors)
                 elif args.mode == 'smpl':
-                    mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smpl.faces)
-                # mesh.export(os.path.join(self.save_path, 'test.obj'))
+                    mesh = trimesh.Trimesh(output.vertices[i].cpu(), self.smpl.faces,
+                                           vertex_colors=self.vertex_colors)
                 view.append(mesh)
             meshes.append(view)
 
