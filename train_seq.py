@@ -12,7 +12,10 @@ import sys
 
 import torch
 import torch.nn.functional as F
-import wandb
+try:
+    import wandb
+except Exception:
+    wandb = None
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from accelerate.state import AcceleratorState
 from torch.utils.data import DataLoader
@@ -166,11 +169,13 @@ class EDGE:
         if self.accelerator.is_main_process:
             save_dir = str(increment_path(Path(opt.project) / opt.exp_name))
             opt.exp_name = save_dir.split("/")[-1]
-            wandb.init(project=opt.wandb_pj_name, name=opt.exp_name)
+            if wandb is not None:
+                wandb.init(project=opt.wandb_pj_name, name=opt.exp_name)
             save_dir = Path(save_dir)
             wdir = save_dir / "weights"
             wdir.mkdir(parents=True, exist_ok=True)
-            wandb.save("params.yaml")  # 保存wandb配置到文件
+            if wandb is not None:
+                wandb.save("params.yaml")
             yaml_path = os.path.join(wdir, 'parameters.yaml')
             save_arguments_to_yaml(opt, yaml_path)
 
@@ -233,7 +238,8 @@ class EDGE:
                         "Foot Loss": avg_footloss,
                     }
             
-                    wandb.log(log_dict)
+                    if wandb is not None:
+                        wandb.log(log_dict)
                 
                     ckpt = {
                         "ema_state_dict": self.diffusion.master_model.state_dict(),     # 经过accelerate prepare的模型，在保存时需要unwrap，反之不需要
@@ -276,7 +282,8 @@ class EDGE:
             
             
         if self.accelerator.is_main_process:
-            wandb.run.finish()
+            if wandb is not None and wandb.run is not None:
+                wandb.run.finish()
 
     def render_sample(
         self, data_tuple, label, render_dir, render_count=-1, mode='normal', fk_out=None, render=True,
