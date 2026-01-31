@@ -16,7 +16,7 @@ base_model: li-ronghui/FineDance
 
 **Music-to-dance generation with a Gradio web UI and single-command CLI.**
 
-TunaDance builds on [FineDance](https://github.com/li-ronghui/FineDance) (ICCV 2023), a diffusion-based model that generates full-body 3D dance from music. This fork adds a user-friendly interface layer and macOS support so you can go from an audio file to a rendered dance video without touching the training or inference internals.
+TunaDance builds on [FineDance](https://github.com/li-ronghui/FineDance) (ICCV 2023), a diffusion-based model that generates full-body 3D dance from music. This fork finetunes the original model on additional data and for more epochs beyond the original 2000, and adds a user-friendly interface layer and macOS support so you can go from an audio file to a rendered dance video without touching the inference internals.
 
 [[Original Paper](https://arxiv.org/abs/2212.03741)] | [[Original Project Page](https://li-ronghui.github.io/finedance)] | [[Original Repo](https://github.com/li-ronghui/FineDance)]
 
@@ -28,6 +28,7 @@ TunaDance builds on [FineDance](https://github.com/li-ronghui/FineDance) (ICCV 2
 - **Single-command CLI** (`generate_dance.py`) — One command handles the full pipeline: audio feature extraction, diffusion sampling, SMPLX rendering, and audio-video muxing.
 - **macOS / MPS support** — Updated `render.py`, `vis.py`, and inference code to run on Apple Silicon via MPS, with a dedicated `environment_macos.yaml`.
 - **Accepts any audio format** — Automatically converts input to WAV via ffmpeg (`.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg`, etc.).
+- **Finetuned checkpoint** — Finetuned the original FineDance model on additional data and for more epochs beyond the original 2000, improving dance quality and diversity.
 - **Cleaned-up repo** — Removed wandb logs, debug scripts, and hardcoded paths.
 
 ## Model Details
@@ -37,7 +38,7 @@ TunaDance builds on [FineDance](https://github.com/li-ronghui/FineDance) (ICCV 2
 | **Architecture** | Transformer decoder with Gaussian diffusion |
 | **Input** | 35-dim audio features (onset, 20 MFCC, 12 chroma, peak/beat onehot) per 4s window |
 | **Output** | SMPLX body motion — 319-dim (4 contact + 3 translation + 52 joints x 6 rotation) |
-| **Checkpoint** | `assets/checkpoints/train-2000.pt` (2000 epochs on FineDance dataset) |
+| **Checkpoint** | `assets/checkpoints/train-2000.pt` (finetuned beyond 2000 epochs on additional data) |
 | **Body model** | SMPLX (full body with hands) |
 | **Training data** | FineDance dataset (7.7 hours of music-dance pairs) |
 
