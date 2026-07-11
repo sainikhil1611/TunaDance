@@ -390,7 +390,7 @@ def skeleton_render(
         if render:
             print(f"ffmpeg -loglevel error -stream_loop 0 -y -i {gifname} -i {audioname} -shortest -c:v libx264 -crf 26 -c:a aac -q:a 4 {outname}")
             out = os.system(
-                f"/home/lrh/Documents/ffmpeg-6.0-amd64-static/ffmpeg -loglevel error -stream_loop 0 -y -i {gifname} -i {audioname} -shortest -c:v libx264 -crf 26 -c:a aac -q:a 4 {outname}"
+                f"ffmpeg -loglevel error -stream_loop 0 -y -i {gifname} -i {audioname} -shortest -c:v libx264 -crf 26 -c:a aac -q:a 4 {outname}"
             )
     else:
         if render:
@@ -659,13 +659,16 @@ class SMPLX_Skeleton:
     
     
 if __name__ == "__main__":
+    # Dev-only smoke test, not part of the app.py / generate_dance.py pipeline.
+    # Pass a motion .pkl (from the FineDance dataset) as the first CLI arg.
+    if len(sys.argv) < 2:
+        sys.exit("Usage: python vis.py <path-to-motion.pkl>")
     print("1")
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    
-    
+
     smplx_fk = SMPLX_Skeleton(device = device, batch=150)
-    motion_file = "/home/data/lrh/datasets/fine_dance/magicsmpl/sliced/test/dances/012_slice0.pkl"
-    # music_file = "/home/data/lrh/datasets/fine_dance/magicsmpl/sliced/test/wavs/012_slice0.wav"
+    motion_file = sys.argv[1]
+    # music_file = "<path-to-matching-wav>"
     local_q_165, root_pos = smplx_fk.motion_data_load_process(motion_file)
     print("local_q_165.shape", local_q_165.shape)
     print("root_pos.shape", root_pos.shape)
