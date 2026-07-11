@@ -104,4 +104,8 @@ with gr.Blocks(title="FineDance") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1")
+    # 127.0.0.1 by default (local-only); the Dockerfile sets
+    # GRADIO_SERVER_NAME=0.0.0.0 so the UI is reachable through -p port
+    # mapping. gradio would honor this env var natively if server_name
+    # were not passed, but being explicit keeps local behavior obvious.
+    demo.launch(server_name=os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1"))
