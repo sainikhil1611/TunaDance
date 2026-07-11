@@ -6,8 +6,21 @@ Usage:
     python app.py
 """
 
+import argparse
 import os
+import sys
 import tempfile
+
+# Parse args before the heavy gradio/torch imports below so that
+# `python app.py --help` (e.g. a container health-check probe) exits
+# immediately without loading the model or any GPU/ML dependencies.
+_parser = argparse.ArgumentParser(description=__doc__)
+_parser.add_argument(
+    "--checkpoint",
+    default="assets/checkpoints/train-2000.pt",
+    help="Path to the pretrained model checkpoint (default: assets/checkpoints/train-2000.pt)",
+)
+_cli_args = _parser.parse_args()
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -32,7 +45,17 @@ from render import MovieMaker
 
 # Preload model once at startup
 print("Loading model...")
-MODEL = load_model()
+if not os.path.isfile(_cli_args.checkpoint):
+    sys.exit(
+        f"Checkpoint not found: {_cli_args.checkpoint}\n"
+        "Download the pretrained checkpoint (and SMPLX model) from the Google "
+        "Drive link in README.md and place it under assets/checkpoints/. "
+        "See the README's \"Current blockers / asset provisioning\" section."
+    )
+try:
+    MODEL = load_model(checkpoint_path=_cli_args.checkpoint)
+except Exception as exc:
+    sys.exit(f"Failed to load model from {_cli_args.checkpoint}: {exc}")
 print("Model loaded. Initializing renderer...")
 
 # Create MovieMaker on the main thread so pyglet's signal handler works.
