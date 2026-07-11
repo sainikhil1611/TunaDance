@@ -17,3 +17,10 @@ teaser/
 *.ogg
 *.m4a
 .DS_Store
+
+# Non-redistributable model assets — mounted at runtime per README
+# (docker run -v $(pwd)/assets:/app/assets ...), never baked into the image.
+assets/checkpoints/
+assets/smpl_model/
+assets/ffmpeg-6.0-amd64-static/
+assets/NORMAL_new.obj
