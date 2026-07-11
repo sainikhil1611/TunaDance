@@ -160,10 +160,20 @@ def generate(music_path, output_path, model=None, visualizer=None, log_fn=print)
     if music_path.lower().endswith(".wav"):
         shutil.copy2(music_path, wav_path)
     else:
-        subprocess.run(
-            ["ffmpeg", "-i", music_path, wav_path, "-y"],
-            capture_output=True, check=True,
-        )
+        try:
+            subprocess.run(
+                ["ffmpeg", "-i", music_path, wav_path, "-y"],
+                capture_output=True, check=True,
+            )
+        except FileNotFoundError:
+            sys.exit(
+                "ffmpeg not found on PATH. Install it at the OS level "
+                "(Debian/Ubuntu: apt-get install ffmpeg; macOS: brew install ffmpeg) "
+                "and try again."
+            )
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
+            sys.exit(f"ffmpeg failed to convert {music_path} to WAV:\n{stderr}")
 
     # Step 2: Slice and extract features
     log_fn("[2/5] Extracting audio features...")
