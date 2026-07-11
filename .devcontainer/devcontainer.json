@@ -1,0 +1,6 @@
+{
+  "name": "TunaDance",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y ffmpeg libgl1 libegl1 libgles2 libglu1-mesa && pip install --user -r requirements.txt",
+  "forwardPorts": [7860]
+}
